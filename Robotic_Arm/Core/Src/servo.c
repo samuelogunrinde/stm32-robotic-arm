@@ -2,6 +2,7 @@
 
 #define SERVO_COUNT 4
 
+// Store pulse width modulation (PWM) channels
 static const uint32_t servo_channels[SERVO_COUNT] = {
 		TIM_CHANNEL_1,
 		TIM_CHANNEL_2,

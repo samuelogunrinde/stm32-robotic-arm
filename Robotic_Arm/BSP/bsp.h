@@ -25,9 +25,10 @@ enum EventSignals {
 	POLL_SIG
 };
 
-/* Active objects... */
-extern QActive *AO_RobotController;
-extern QActive *AO_ServoController;
-extern QActive *AO_IRSensor;
+// Servo movement event
+typedef struct {
+	QEvt super;
+	uint16_t angle[4];
+} ServoMoveEvt;
 
 #endif

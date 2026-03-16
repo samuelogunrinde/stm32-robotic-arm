@@ -2,12 +2,15 @@
 #include "qpc.h"
 
 void SysTick_Handler(void) {
-	QF_TICK_X(0U, (void *)0); /* process all QP/C time events */
+	QF_TICK_X(0U, (void *)0); // process all QP/C time events
 }
 
 void BSP_Init(void) {
+	// Initialize gpio pins
 	MX_GPIO_Init();
+	// Initialize timer2 for pulse width modulation (PWM)
 	MX_TIM2_Init();
+	// Initialize timer3 for 38kHz infrared (IR) transmission
 	MX_TIM3_Init();
 }
 
