@@ -23,20 +23,31 @@ QState ServoController_idle(ServoController * const me, QEvt const * const e) {
 	QState status_;
 	switch (e->sig) {
         case MOVE_SERVO_SIG: {
+
         	// Turn servo predefined movements into PWM servo control
             ServoMoveEvt const *evt = (ServoMoveEvt const *)e;
+
             for (uint8_t i = 0; i < 4; i++) {
                 Servo_SetAngle(i, evt->angle[i]);
             }
-            Servo_Update();
-            // Arm the time event
-            QTimeEvt_armX(&me->servoTimer, BSP_TICKS_PER_SEC/2, 0U);
+
+            // Start periodic update (20ms)
+            QTimeEvt_armX(&me->servoTimer, BSP_TICKS_PER_SEC/50, BSP_TICKS_PER_SEC/50);
             status_ = Q_HANDLED();
             break;
         }
         case SERVO_DONE_SIG: {
-        	// Post servo movement done signal to RobotController active object
-        	QACTIVE_POST(AO_RobotController, Q_NEW(QEvt, SERVO_DONE_SIG), me);
+
+        	// Motion control
+        	Servo_Update(0.02f);
+
+        	if (Servo_IsAtTarget()) {
+        		QTimeEvt_disarm(&me->servoTimer);
+
+        		// Post servo movement done signal to RobotController active object
+        		QACTIVE_POST(AO_RobotController, Q_NEW(QEvt, SERVO_DONE_SIG), me);
+        	}
+
         	status_ = Q_HANDLED();
         	break;
         }

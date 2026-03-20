@@ -30,12 +30,18 @@ QState Robot_idle(RobotController * const me, QEvt const * const e) {
 	QState status_;
 	switch(e->sig) {
 		case Q_ENTRY_SIG: {
+			BSP_ledGreenOn();
 			status_ = Q_HANDLED();
 			break;
 		}
 		case OBJECT_DETECTED_SIG: {
 			// transition to the next state
 			status_ = Q_TRAN(&Robot_move_to_pick);
+			break;
+		}
+		case Q_EXIT_SIG: {
+			BSP_ledGreenOff();
+			status_ = Q_HANDLED();
 			break;
 		}
 		default: {

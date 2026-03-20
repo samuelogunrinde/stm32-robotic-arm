@@ -9,6 +9,8 @@
 typedef struct {
 	QActive super;
 	QTimeEvt pollTimer;
+	bool detection_enabled;
+	uint16_t startup_count;
 } IRSensor;
 
 // Function prototypes

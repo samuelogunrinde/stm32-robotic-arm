@@ -23,19 +23,38 @@ QState IRSensor_monitor(IRSensor * const me, QEvt const * const e) {
 	QState status_;
 	switch (e->sig) {
 		case Q_ENTRY_SIG: {
+
+			me->detection_enabled = false;
+
+			me->startup_count = 0;
+
 			// sample sensor every 20 ms
 			QTimeEvt_armX(&me->pollTimer, BSP_TICKS_PER_SEC/10, BSP_TICKS_PER_SEC/50);
+
 			status_ = Q_HANDLED();
 			break;
 		}
 		case POLL_SIG: {
-		if (IR_Detected()) {
+
+			// Startup blanking
+			if (!me->detection_enabled) {
+				me->startup_count++;
+
+				if (me->startup_count >= 500) {
+					me->detection_enabled = true;
+				}
+				status_ = Q_HANDLED();
+				break; // ignore object detection
+			}
+
+			// Object detection
+			if (IR_Detected()) {
 			// send detection event to RobotController active object
 			QACTIVE_POST(AO_RobotController, Q_NEW(QEvt, OBJECT_DETECTED_SIG),
 					me);
-		}
-		status_ = Q_HANDLED();
-		break;
+			}
+			status_ = Q_HANDLED();
+			break;
 	}
 		default: {
 			status_ = Q_SUPER(&QHsm_top);
