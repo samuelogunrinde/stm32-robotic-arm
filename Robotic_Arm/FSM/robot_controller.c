@@ -1,7 +1,7 @@
 #include "robot_controller.h"
 #include "servo_controller.h"
 #include "bsp.h"
-#include "servo_moves.h"
+#include "inverse_kinematics.h"
 
 void sendMove(RobotController *me, const uint16_t move[4]) {
 	// Allocate an event object from an event pool
@@ -13,6 +13,19 @@ void sendMove(RobotController *me, const uint16_t move[4]) {
 
 	// Post desired movement (event) to the Servo Active Object queue
 	QACTIVE_POST(AO_ServoController, &evt->super, me);
+}
+
+// Generate servo angles from given positions
+void moveToXYZ(RobotController *me, float x, float y, float z, uint16_t grip) {
+
+    uint16_t angles[4];
+
+    if (IK_Solve(x, y, z, angles)) {
+
+        angles[3] = grip;   // gripper independent
+
+        sendMove(me, angles);
+    }
 }
 
 // Active object constructor
@@ -57,7 +70,7 @@ QState Robot_move_to_pick(RobotController * const me, QEvt const * const e) {
 	switch(e->sig) {
 		case Q_ENTRY_SIG: {
 			// post servo movement event
-			sendMove(me, MOVE_PICK);
+			moveToXYZ(me, PICK.x, PICK.y, PICK.z, GRIP_OPEN);
 			status_ = Q_HANDLED();
 			break;
 		}
@@ -79,7 +92,7 @@ QState Robot_grip(RobotController * const me, QEvt const * const e) {
 	switch(e->sig) {
 		case Q_ENTRY_SIG: {
 			// post servo movement event
-			sendMove(me, MOVE_GRIP);
+			moveToXYZ(me, PICK.x, PICK.y, PICK.z, GRIP_CLOSE);
 			status_ = Q_HANDLED();
 			break;
 		}
@@ -101,7 +114,7 @@ QState Robot_lift(RobotController * const me, QEvt const * const e) {
 	switch(e->sig) {
 		case Q_ENTRY_SIG: {
 			// post servo movement event
-			sendMove(me, MOVE_LIFT);
+			moveToXYZ(me, LIFT.x, LIFT.y, LIFT.z, GRIP_CLOSE);
 			status_ = Q_HANDLED();
 			break;
 		}
@@ -123,7 +136,7 @@ QState Robot_move_to_place(RobotController * const me, QEvt const * const e) {
 	switch(e->sig) {
 		case Q_ENTRY_SIG: {
 			// post servo movement event
-			sendMove(me, MOVE_PLACE);
+			moveToXYZ(me, PLACE.x, PLACE.y, PLACE.z, GRIP_CLOSE);
 			status_ = Q_HANDLED();
 			break;
 		}
@@ -145,7 +158,7 @@ QState Robot_release(RobotController * const me, QEvt const * const e) {
 	switch(e->sig) {
 		case Q_ENTRY_SIG: {
 			// post servo movement event
-			sendMove(me, MOVE_RELEASE);
+			moveToXYZ(me, PLACE.x, PLACE.y, PLACE.z, GRIP_OPEN);
 			status_ = Q_HANDLED();
 			break;
 		}
@@ -167,7 +180,7 @@ QState Robot_return_home(RobotController * const me, QEvt const * const e) {
 	switch(e->sig) {
 		case Q_ENTRY_SIG: {
 			// post servo movement event
-			sendMove(me, MOVE_HOME);
+			moveToXYZ(me, HOME.x, HOME.y, HOME.z, GRIP_CLOSE);
 			status_ = Q_HANDLED();
 			break;
 		}
