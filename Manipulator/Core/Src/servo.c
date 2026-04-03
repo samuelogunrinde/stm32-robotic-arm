@@ -1,0 +1,131 @@
+#include "bsp.h"
+#include <math.h>
+
+#define SERVO_COUNT 4
+#define MAX_SERVO_ANGLE 180
+
+// Array to store servo angles
+static float current_angles[SERVO_COUNT] = {0};
+static float target_angles[SERVO_COUNT] = {0};
+// Array to store motion velocity
+static float velocity[SERVO_COUNT] = {0};
+
+// Synchronize servos
+static uint8_t is_synced = 0;
+
+// tuning parameters
+static float max_speed = 100.0f;    // deg/sec
+static float accel = 200.0f;    // deg/sec^2
+
+// Store pulse width modulation (PWM) channels
+static const uint32_t servo_channels[SERVO_COUNT] = {
+		TIM_CHANNEL_1,
+		TIM_CHANNEL_2,
+		TIM_CHANNEL_3,
+		TIM_CHANNEL_4
+};
+
+// Start all PWM channels
+void Servo_Init(void) {
+	for (uint8_t i = 0; i < SERVO_COUNT; i++) {
+		HAL_TIM_PWM_Start(&htim2, servo_channels[i]);
+	}
+}
+
+// Insert the target servo angles
+void Servo_SetAngle(uint8_t servo_id, uint8_t angle) {
+
+	if (servo_id >= SERVO_COUNT) return;
+
+	if (angle > MAX_SERVO_ANGLE) angle = MAX_SERVO_ANGLE;
+
+	target_angles[servo_id] = (float)angle;
+
+	// snap current to target
+	if (!is_synced) {
+	current_angles[servo_id] = target_angles[servo_id];
+	velocity[servo_id] = 0;
+	}
+}
+
+// Motion control
+// Trapezoidal velocity profile
+void Servo_Update(float dt) {
+	// Loop through all servos and set their angles
+	for (uint8_t i = 0; i < SERVO_COUNT; i++) {
+
+		float diff = target_angles[i] - current_angles[i];
+		float abs_diff = fabsf(diff);
+
+		// stopping condition
+		if (abs_diff < 0.5f && fabsf(velocity[i]) < 1.0f) {
+			current_angles[i] = target_angles[i];
+			velocity[i] = 0;
+		} else {
+			// Compute stopping distance
+			float stopping_distance = (velocity[i] * velocity[i])
+					/ (2.0f * accel);
+			// Decide whether to accelerate or decelerate
+			if (abs_diff <= stopping_distance) {
+				// gradual DECELERATE
+				if (velocity[i] > 0)
+					velocity[i] -= accel * dt;
+				else
+					velocity[i] += accel * dt;
+			} else {
+				// gradual ACCELERATE toward target
+				if (diff > 0)
+					velocity[i] += accel * dt;
+				else
+					velocity[i] -= accel * dt;
+			}
+
+			// Limit max speed
+			if (velocity[i] > max_speed) velocity[i] = max_speed;
+			if (velocity[i] < -max_speed) velocity[i] = -max_speed;
+
+			// Update position
+			current_angles[i] += velocity[i] * dt;
+
+			// Prevent overshoot
+			if ((diff > 0 && current_angles[i] > target_angles[i])
+					|| (diff < 0 && current_angles[i] < target_angles[i])) {
+
+				current_angles[i] = target_angles[i];
+				velocity[i] = 0;
+			}
+		}
+		// angle to pulse plus 0.5ms offset
+		uint32_t pulse_us = 500 + ((uint32_t) current_angles[i] * 2000) / 180;
+		__HAL_TIM_SET_COMPARE(&htim2, servo_channels[i], pulse_us);
+	}
+	is_synced = 1;
+}
+
+// Check if motion is complete
+bool Servo_IsAtTarget(void) {
+    for (uint8_t i = 0; i < SERVO_COUNT; i++) {
+
+        float pos_error = fabsf(current_angles[i] - target_angles[i]);
+
+        // if still far → definitely not done
+        if (pos_error > 0.5f) {
+            return false;
+        }
+
+        // if velocity still significant → not done
+        if (fabsf(velocity[i]) > 1.0f) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Generate target servo angles for serial monitoring (UART)
+void Servo_GetAngles(float *angles)
+{
+    for (uint8_t i = 0; i < SERVO_COUNT; i++) {
+        angles[i] = current_angles[i];
+    }
+    return;
+}
